@@ -31,6 +31,7 @@ export default function AdminComplaintsPage() {
   const [statusFilter, setStatusFilter] = useState<string>("all")
   const [categoryFilter, setCategoryFilter] = useState<string>("all")
 
+  // Cargar reclamos
   useEffect(() => {
     if (!user) {
       router.push("/auth/login")
@@ -45,7 +46,7 @@ export default function AdminComplaintsPage() {
     const fetchComplaints = async () => {
       try {
         const res = await fetch("/api/auth/complaints?adminView=true")
-        const data = await res.json()
+        const data: ComplaintWithVotes[] = await res.json()
         setComplaints(data)
       } catch (error) {
         console.error("Error al cargar reclamos:", error)
@@ -55,29 +56,30 @@ export default function AdminComplaintsPage() {
     fetchComplaints()
   }, [user, router])
 
+  // Filtrado y búsqueda
   useEffect(() => {
     let filtered = complaints
 
     if (searchTerm) {
       filtered = filtered.filter(
-        (complaint) =>
-          complaint.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          complaint.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          complaint.authorName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          complaint.location?.toLowerCase().includes(searchTerm.toLowerCase())
+        (c) =>
+          c.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          c.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          c.authorName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          c.location?.toLowerCase().includes(searchTerm.toLowerCase())
       )
     }
 
     if (entityFilter !== "all") {
-      filtered = filtered.filter((complaint) => complaint.entity === entityFilter)
+      filtered = filtered.filter((c) => c.entity === entityFilter)
     }
 
     if (statusFilter !== "all") {
-      filtered = filtered.filter((complaint) => complaint.status === statusFilter)
+      filtered = filtered.filter((c) => c.status === statusFilter)
     }
 
     if (categoryFilter !== "all") {
-      filtered = filtered.filter((complaint) => complaint.category === categoryFilter)
+      filtered = filtered.filter((c) => c.category === categoryFilter)
     }
 
     setFilteredComplaints(filtered)
@@ -91,16 +93,13 @@ export default function AdminComplaintsPage() {
         body: JSON.stringify({ complaintId, status: newStatus }),
       })
 
-      const data = await res.json()
       if (!res.ok) throw new Error("Error al actualizar el estado")
 
-     setComplaints((prev) =>
-      prev.map((complaint) =>
-        complaint.id === complaintId
-     ? { ...complaint, status: newStatus, updatedAt: new Date().toISOString() }
-     : complaint
-    ))
-
+      setComplaints((prev) =>
+        prev.map((c) =>
+          c.id === complaintId ? { ...c, status: newStatus, updatedAt: new Date().toISOString() } : c
+        )
+      )
 
       toast({
         title: `Reclamo ${newStatus === "closed" ? "cerrado" : "reabierto"}`,
@@ -112,7 +111,7 @@ export default function AdminComplaintsPage() {
   }
 
   const entities = ["Municipios", "Escuelas", "Clubes", "Cooperativas"]
-  const categories = [...new Set(complaints.map((c) => c.category))]
+  const categories = [...new Set(complaints.map((c) => c.category).filter(Boolean))]
   const getStatusColor = (status: string) =>
     status === "open" ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-800"
 
@@ -129,6 +128,7 @@ export default function AdminComplaintsPage() {
             <p className="text-gray-600">Administra todos los reclamos del sistema</p>
           </div>
 
+          {/* Filtros */}
           <Card className="mb-6">
             <CardHeader>
               <CardTitle className="text-lg">Filtros</CardTitle>
@@ -188,32 +188,41 @@ export default function AdminComplaintsPage() {
             </CardContent>
           </Card>
 
+          {/* Estadísticas */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-            <Card><CardContent className="p-4">
-              <div className="text-2xl font-bold">{filteredComplaints.length}</div>
-              <p className="text-sm text-gray-600">Total Filtrados</p>
-            </CardContent></Card>
-            <Card><CardContent className="p-4">
-              <div className="text-2xl font-bold text-green-600">
-                {filteredComplaints.filter((c) => c.status === "open").length}
-              </div>
-              <p className="text-sm text-gray-600">Abiertos</p>
-            </CardContent></Card>
-            <Card><CardContent className="p-4">
-              <div className="text-2xl font-bold text-gray-600">
-                {filteredComplaints.filter((c) => c.status === "closed").length}
-              </div>
-              <p className="text-sm text-gray-600">Cerrados</p>
-            </CardContent></Card>
-            <Card><CardContent className="p-4">
-              <div className="text-2xl font-bold text-blue-600">
-                {filteredComplaints.reduce((sum, c) => sum + (c.userVotes?.length ?? 0), 0)}
-              </div>
+            <Card>
+              <CardContent className="p-4">
+                <div className="text-2xl font-bold">{filteredComplaints.length}</div>
+                <p className="text-sm text-gray-600">Total Filtrados</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-4">
+                <div className="text-2xl font-bold text-green-600">
+                  {filteredComplaints.filter((c) => c.status === "open").length}
+                </div>
+                <p className="text-sm text-gray-600">Abiertos</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-4">
+                <div className="text-2xl font-bold text-gray-600">
+                  {filteredComplaints.filter((c) => c.status === "closed").length}
+                </div>
+                <p className="text-sm text-gray-600">Cerrados</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-4">
+                <div className="text-2xl font-bold text-blue-600">
+                  {filteredComplaints.reduce((sum, c) => sum + (c.userVotes?.length ?? 0), 0)}
+                </div>
                 <p className="text-sm text-gray-600">Total Votos</p>
               </CardContent>
             </Card>
           </div>
 
+          {/* Lista de reclamos */}
           <div className="space-y-4">
             {filteredComplaints.map((complaint) => (
               <Card key={complaint.id}>
@@ -239,7 +248,9 @@ export default function AdminComplaintsPage() {
 
                           <div className="flex items-center gap-4 text-sm text-gray-500">
                             <span>Por: {complaint.authorName}</span>
-                            <span>Creado: {new Date(complaint.createdAt).toLocaleDateString()}</span>
+                            <span>
+                              Creado: {new Date(complaint.createdAt).toLocaleDateString()}
+                            </span>
                             <span>Ubicación: {complaint.location}</span>
                             <span>Votos: {complaint.userVotes?.length ?? 0}</span>
                           </div>

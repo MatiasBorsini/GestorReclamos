@@ -1,8 +1,6 @@
 "use client"
 
-import type React from "react"
-
-import { useState, useEffect } from "react"
+import React, { useState, useEffect } from "react"
 import { useAuth } from "@/contexts/auth-context"
 import { Sidebar } from "@/components/layout/sidebar"
 import { Button } from "@/components/ui/button"
@@ -16,7 +14,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Switch } from "@/components/ui/switch"
 import { MessageSquare, Plus, Edit, Trash2, Search } from "lucide-react"
-import { mockFAQs } from "@/lib/mock-admin-data"
 import type { FAQ } from "@/types/faq"
 import { useRouter } from "next/navigation"
 import { useToast } from "@/hooks/use-toast"
@@ -26,8 +23,9 @@ export default function AdminFAQsPage() {
   const router = useRouter()
   const { toast } = useToast()
 
-  const [faqs, setFaqs] = useState<FAQ[]>(mockFAQs)
-  const [filteredFaqs, setFilteredFaqs] = useState<FAQ[]>(mockFAQs)
+  const [faqs, setFaqs] = useState<FAQ[]>([])
+  const [filteredFaqs, setFilteredFaqs] = useState<FAQ[]>([])
+  const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState("")
   const [categoryFilter, setCategoryFilter] = useState<string>("all")
   const [statusFilter, setStatusFilter] = useState<string>("all")
@@ -43,18 +41,38 @@ export default function AdminFAQsPage() {
   })
   const [formError, setFormError] = useState("")
 
+  // Redirección si no es admin
   useEffect(() => {
     if (!user) {
       router.push("/auth/login")
       return
     }
-
     if (user.role !== "admin") {
       router.push("/dashboard")
       return
     }
   }, [user, router])
 
+  // Cargar FAQs desde API
+  useEffect(() => {
+    if (!user || user.role !== "admin") return
+
+    fetch("/api/admin/faqs")
+      .then((res) => res.json())
+      .then((data: FAQ[]) => {
+        const parsed = data.map((f) => ({
+          ...f,
+          createdAt: new Date(f.createdAt),
+          updatedAt: new Date(f.updatedAt),
+        }))
+        setFaqs(parsed)
+        setFilteredFaqs(parsed)
+      })
+      .catch(() => toast({ title: "Error", description: "No se pudieron cargar las FAQs", variant: "destructive" }))
+      .finally(() => setLoading(false))
+  }, [user, toast])
+
+  // Filtros y búsqueda
   useEffect(() => {
     let filtered = faqs
 
@@ -62,7 +80,7 @@ export default function AdminFAQsPage() {
       filtered = filtered.filter(
         (faq) =>
           faq.question.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          faq.answer.toLowerCase().includes(searchTerm.toLowerCase()),
+          faq.answer.toLowerCase().includes(searchTerm.toLowerCase())
       )
     }
 
@@ -77,7 +95,7 @@ export default function AdminFAQsPage() {
     setFilteredFaqs(filtered)
   }, [faqs, searchTerm, categoryFilter, statusFilter])
 
-  if (!user || user.role !== "admin") {
+  if (!user || user.role !== "admin" || loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600"></div>
@@ -88,12 +106,7 @@ export default function AdminFAQsPage() {
   const categories = [...new Set(faqs.map((faq) => faq.category))]
 
   const resetForm = () => {
-    setFormData({
-      question: "",
-      answer: "",
-      category: "",
-      isActive: true,
-    })
+    setFormData({ question: "", answer: "", category: "", isActive: true })
     setEditingFaq(null)
     setFormError("")
   }
@@ -104,17 +117,12 @@ export default function AdminFAQsPage() {
   }
 
   const openEditDialog = (faq: FAQ) => {
-    setFormData({
-      question: faq.question,
-      answer: faq.answer,
-      category: faq.category,
-      isActive: faq.isActive,
-    })
+    setFormData({ question: faq.question, answer: faq.answer, category: faq.category, isActive: faq.isActive })
     setEditingFaq(faq)
     setIsDialogOpen(true)
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setFormError("")
 
@@ -122,105 +130,95 @@ export default function AdminFAQsPage() {
       setFormError("Todos los campos son obligatorios")
       return
     }
-
     if (formData.question.length < 10) {
       setFormError("La pregunta debe tener al menos 10 caracteres")
       return
     }
-
     if (formData.answer.length < 20) {
       setFormError("La respuesta debe tener al menos 20 caracteres")
       return
     }
 
-    if (editingFaq) {
-      // Update existing FAQ
+    try {
+      if (editingFaq) {
+        // Update FAQ
+        const res = await fetch(`/api/admin/faqs/${editingFaq.id}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(formData),
+        })
+        const updated: FAQ = await res.json()
+        setFaqs((prev) =>
+          prev.map((f) =>
+            f.id === updated.id ? { ...updated, createdAt: new Date(updated.createdAt), updatedAt: new Date(updated.updatedAt) } : f
+          )
+        )
+        toast({ title: "FAQ actualizada", description: "La pregunta frecuente ha sido actualizada exitosamente." })
+      } else {
+        // Create FAQ
+        const res = await fetch(`/api/admin/faqs`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(formData),
+        })
+        const created: FAQ = await res.json()
+        setFaqs((prev) => [
+          { ...created, createdAt: new Date(created.createdAt), updatedAt: new Date(created.updatedAt) },
+          ...prev,
+        ])
+        toast({ title: "FAQ creada", description: "La nueva pregunta frecuente ha sido creada exitosamente." })
+      }
+      setIsDialogOpen(false)
+      resetForm()
+    } catch (err) {
+      toast({ title: "Error", description: "No se pudo guardar la FAQ", variant: "destructive" })
+    }
+  }
+
+  const handleDelete = async (faqId: string) => {
+    if (!confirm("¿Estás seguro de que quieres eliminar esta FAQ?")) return
+    try {
+      await fetch(`/api/admin/faqs/${faqId}`, { method: "DELETE" })
+      setFaqs((prev) => prev.filter((f) => f.id !== faqId))
+      toast({ title: "FAQ eliminada", description: "La pregunta frecuente ha sido eliminada exitosamente." })
+    } catch {
+      toast({ title: "Error", description: "No se pudo eliminar la FAQ", variant: "destructive" })
+    }
+  }
+
+  const handleToggleStatus = async (faqId: string) => {
+    try {
+      const res = await fetch(`/api/admin/faqs/${faqId}`, { method: "PATCH" })
+      const updated: FAQ = await res.json()
       setFaqs((prev) =>
-        prev.map((faq) =>
-          faq.id === editingFaq.id
-            ? {
-                ...faq,
-                question: formData.question.trim(),
-                answer: formData.answer.trim(),
-                category: formData.category.trim(),
-                isActive: formData.isActive,
-                updatedAt: new Date(),
-              }
-            : faq,
-        ),
+        prev.map((f) =>
+          f.id === updated.id ? { ...updated, createdAt: new Date(updated.createdAt), updatedAt: new Date(updated.updatedAt) } : f
+        )
       )
       toast({
-        title: "FAQ actualizada",
-        description: "La pregunta frecuente ha sido actualizada exitosamente.",
+        title: `FAQ ${updated.isActive ? "activada" : "desactivada"}`,
+        description: `La pregunta frecuente ha sido ${updated.isActive ? "activada" : "desactivada"}.`,
       })
-    } else {
-      // Create new FAQ
-      const newFaq: FAQ = {
-        id: Date.now().toString(),
-        question: formData.question.trim(),
-        answer: formData.answer.trim(),
-        category: formData.category.trim(),
-        isActive: formData.isActive,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      }
-      setFaqs((prev) => [newFaq, ...prev])
-      toast({
-        title: "FAQ creada",
-        description: "La nueva pregunta frecuente ha sido creada exitosamente.",
-      })
+    } catch {
+      toast({ title: "Error", description: "No se pudo actualizar el estado", variant: "destructive" })
     }
-
-    setIsDialogOpen(false)
-    resetForm()
-  }
-
-  const handleDelete = (faqId: string) => {
-    const faqToDelete = faqs.find((faq) => faq.id === faqId)
-    if (!faqToDelete) return
-
-    if (confirm(`¿Estás seguro de que quieres eliminar la FAQ "${faqToDelete.question}"?`)) {
-      setFaqs((prev) => prev.filter((faq) => faq.id !== faqId))
-      toast({
-        title: "FAQ eliminada",
-        description: "La pregunta frecuente ha sido eliminada exitosamente.",
-      })
-    }
-  }
-
-  const handleToggleStatus = (faqId: string) => {
-    setFaqs((prev) =>
-      prev.map((faq) => (faq.id === faqId ? { ...faq, isActive: !faq.isActive, updatedAt: new Date() } : faq)),
-    )
-
-    const faq = faqs.find((f) => f.id === faqId)
-    toast({
-      title: `FAQ ${faq?.isActive ? "desactivada" : "activada"}`,
-      description: `La pregunta frecuente ha sido ${faq?.isActive ? "desactivada" : "activada"}.`,
-    })
   }
 
   return (
     <div className="flex min-h-screen bg-gray-50">
       <Sidebar />
-
       <main className="flex-1 md:ml-64">
         <div className="p-6">
           {/* Header */}
-          <div className="mb-8">
-            <div className="flex items-center justify-between">
-              <div>
-                <div className="flex items-center gap-3 mb-2">
-                  <MessageSquare className="h-8 w-8 text-blue-600" />
-                  <h1 className="text-3xl font-bold text-gray-900">Gestión de FAQs</h1>
-                </div>
-                <p className="text-gray-600">Administra las preguntas frecuentes del chatbot</p>
-              </div>
-              <Button onClick={openCreateDialog} className="bg-blue-600 hover:bg-blue-700">
-                <Plus className="mr-2 h-4 w-4" />
-                Nueva FAQ
-              </Button>
+          <div className="mb-8 flex items-center justify-between">
+            <div className="flex items-center gap-3 mb-2">
+              <MessageSquare className="h-8 w-8 text-blue-600" />
+              <h1 className="text-3xl font-bold text-gray-900">Gestión de FAQs</h1>
             </div>
+            <Button onClick={openCreateDialog} className="bg-blue-600 hover:bg-blue-700">
+              <Plus className="mr-2 h-4 w-4" />
+              Nueva FAQ
+            </Button>
           </div>
 
           {/* Filters */}
@@ -278,17 +276,13 @@ export default function AdminFAQsPage() {
             </Card>
             <Card>
               <CardContent className="p-4">
-                <div className="text-2xl font-bold text-green-600">
-                  {filteredFaqs.filter((faq) => faq.isActive).length}
-                </div>
+                <div className="text-2xl font-bold text-green-600">{filteredFaqs.filter((f) => f.isActive).length}</div>
                 <p className="text-sm text-gray-600">Activas</p>
               </CardContent>
             </Card>
             <Card>
               <CardContent className="p-4">
-                <div className="text-2xl font-bold text-gray-600">
-                  {filteredFaqs.filter((faq) => !faq.isActive).length}
-                </div>
+                <div className="text-2xl font-bold text-gray-600">{filteredFaqs.filter((f) => !f.isActive).length}</div>
                 <p className="text-sm text-gray-600">Inactivas</p>
               </CardContent>
             </Card>
@@ -300,42 +294,38 @@ export default function AdminFAQsPage() {
             </Card>
           </div>
 
-          {/* FAQs List */}
+          {/* FAQ List */}
           <div className="space-y-4">
             {filteredFaqs.map((faq) => (
               <Card key={faq.id}>
-                <CardContent className="p-6">
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-2">
-                        <Badge variant="outline">{faq.category}</Badge>
-                        <Badge variant={faq.isActive ? "default" : "secondary"}>
-                          {faq.isActive ? "Activa" : "Inactiva"}
-                        </Badge>
-                      </div>
-                      <h3 className="font-semibold text-lg mb-2">{faq.question}</h3>
-                      <p className="text-gray-600 mb-3 line-clamp-3">{faq.answer}</p>
-                      <div className="text-sm text-gray-500">
-                        Creada: {faq.createdAt.toLocaleDateString()} | Actualizada: {faq.updatedAt.toLocaleDateString()}
-                      </div>
+                <CardContent className="p-6 flex items-start justify-between">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Badge variant="outline">{faq.category}</Badge>
+                      <Badge variant={faq.isActive ? "default" : "secondary"}>
+                        {faq.isActive ? "Activa" : "Inactiva"}
+                      </Badge>
                     </div>
+                    <h3 className="font-semibold text-lg mb-2">{faq.question}</h3>
+                    <p className="text-gray-600 mb-3 line-clamp-3">{faq.answer}</p>
+                    <div className="text-sm text-gray-500">
+                      Creada: {faq.createdAt.toLocaleDateString()} | Actualizada: {faq.updatedAt.toLocaleDateString()}
+                    </div>
+                  </div>
 
-                    <div className="flex items-center gap-2 ml-4">
-                      <div className="flex items-center gap-2">
-                        <Switch checked={faq.isActive} onCheckedChange={() => handleToggleStatus(faq.id)} />
-                      </div>
-                      <Button variant="outline" size="sm" onClick={() => openEditDialog(faq)}>
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleDelete(faq.id)}
-                        className="text-red-600 hover:text-red-700"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
+                  <div className="flex items-center gap-2 ml-4">
+                    <Switch checked={faq.isActive} onCheckedChange={() => handleToggleStatus(faq.id)} />
+                    <Button variant="outline" size="sm" onClick={() => openEditDialog(faq)}>
+                      <Edit className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleDelete(faq.id)}
+                      className="text-red-600 hover:text-red-700"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
                   </div>
                 </CardContent>
               </Card>

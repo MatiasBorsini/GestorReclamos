@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { ThumbsUp, ThumbsDown, MapPin, Calendar, Edit, Trash2, Eye } from "lucide-react"
-import type { Complaint, Vote } from "@/types/complaint"
+import type { Complaint } from "@/types/complaint"
 import { useAuth } from "@/contexts/auth-context"
 import { useState } from "react"
 import Link from "next/link"
@@ -26,13 +26,8 @@ export function ComplaintCard({
   onDelete,
 }: ComplaintCardProps) {
   const { user } = useAuth()
-
-  // Revisar si el usuario ya votó
-    const existingVote = complaint.userVotes?.find((v) => v.userId === user?.id) || null
-  const [userVote, setUserVote] = useState<"positive" | "negative" | null>(
-    existingVote ? existingVote.type : null
-  )
-
+  const existingVote = user ? complaint.votes.userVotes[user.id] : null
+  const [userVote, setUserVote] = useState<"positive" | "negative" | null>(existingVote ?? null)
 
   const isOwnComplaint = user?.id === complaint.authorId
   const canVote = user && !isOwnComplaint && onVote
@@ -44,17 +39,8 @@ export function ComplaintCard({
     onVote?.(complaint.id, voteType)
   }
 
-  const getStatusColor = (status: string) => {
-    return status === "open"
-      ? "bg-green-100 text-green-800"
-      : "bg-gray-100 text-gray-800"
-  }
-
-  // Contadores de votos
-  const positiveVotes =
-    complaint.userVotes?.filter((v: Vote) => v.type === "positive").length ?? 0
-  const negativeVotes =
-    complaint.userVotes?.filter((v: Vote) => v.type === "negative").length ?? 0
+  const getStatusColor = (status: string) =>
+    status === "open" ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-800"
 
   return (
     <Card className="hover:shadow-md transition-shadow">
@@ -65,9 +51,7 @@ export function ComplaintCard({
             <div className="flex flex-wrap gap-2 mb-3">
               {complaint.entity && <Badge variant="outline">{complaint.entity}</Badge>}
               <Badge variant="secondary">{complaint.category}</Badge>
-              <Badge variant="outline" className="text-xs">
-                {complaint.subcategory}
-              </Badge>
+              <Badge variant="outline" className="text-xs">{complaint.subcategory}</Badge>
               <Badge className={getStatusColor(complaint.status)}>
                 {complaint.status === "open" ? "Abierto" : "Cerrado"}
               </Badge>
@@ -77,9 +61,7 @@ export function ComplaintCard({
 
         <div className="flex items-center gap-2 text-sm text-gray-600">
           <Avatar className="h-6 w-6">
-            <AvatarFallback className="text-xs">
-              {complaint.authorName.charAt(0)}
-            </AvatarFallback>
+            <AvatarFallback className="text-xs">{complaint.authorName.charAt(0)}</AvatarFallback>
           </Avatar>
           <span>{complaint.authorName}</span>
           <Calendar className="h-4 w-4 ml-2" />
@@ -118,7 +100,7 @@ export function ComplaintCard({
                   className="flex items-center gap-1"
                 >
                   <ThumbsUp className="h-4 w-4" />
-                  {positiveVotes}
+                  {complaint.votes.positive}
                 </Button>
                 <Button
                   variant={userVote === "negative" ? "destructive" : "outline"}
@@ -127,18 +109,18 @@ export function ComplaintCard({
                   className="flex items-center gap-1"
                 >
                   <ThumbsDown className="h-4 w-4" />
-                  {negativeVotes}
+                  {complaint.votes.negative}
                 </Button>
               </>
             ) : (
               <div className="flex items-center gap-4 text-sm text-gray-600">
                 <div className="flex items-center gap-1">
                   <ThumbsUp className="h-4 w-4" />
-                  {positiveVotes}
+                  {complaint.votes.positive}
                 </div>
                 <div className="flex items-center gap-1">
                   <ThumbsDown className="h-4 w-4" />
-                  {negativeVotes}
+                  {complaint.votes.negative}
                 </div>
               </div>
             )}
@@ -153,11 +135,7 @@ export function ComplaintCard({
 
             {showActions && isOwnComplaint && (
               <>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => onEdit?.(complaint)}
-                >
+                <Button variant="ghost" size="sm" onClick={() => onEdit?.(complaint)}>
                   <Edit className="h-4 w-4" />
                 </Button>
                 <Button

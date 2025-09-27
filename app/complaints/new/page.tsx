@@ -1,7 +1,5 @@
 "use client"
 
-import type React from "react"
-
 import { useState, useEffect } from "react"
 import { useAuth } from "@/contexts/auth-context"
 import { Sidebar } from "@/components/layout/sidebar"
@@ -12,21 +10,21 @@ import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { ArrowLeft, Upload, X, FileText } from "lucide-react"
+import { ArrowLeft, X } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useToast } from "@/hooks/use-toast"
-import { getEntities, getCategories, getSubcategories } from "@/lib/complaint-data"
-import { saveComplaint } from "@/lib/complaint-storage"
-import type { Complaint } from "@/types/complaint"
+
+type Entity = { id: number; nombre: string }
+type Category = { id: number; nombre: string }
+type Subcategory = { id: number; nombre: string }
 
 export default function NewComplaintPage() {
   const { user } = useAuth()
   const router = useRouter()
   const { toast } = useToast()
 
-  // Form state
   const [title, setTitle] = useState("")
-  const [entity, setEntity] = useState("")
+  const [entityId, setEntityId] = useState("") // ⚡ guardamos el id como string
   const [category, setCategory] = useState("")
   const [subcategory, setSubcategory] = useState("")
   const [description, setDescription] = useState("")
@@ -36,67 +34,73 @@ export default function NewComplaintPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
 
-  // Cascade data
-  const [availableCategories, setAvailableCategories] = useState<string[]>([])
-  const [availableSubcategories, setAvailableSubcategories] = useState<string[]>([])
+  const [entities, setEntities] = useState<Entity[]>([])
+  const [availableCategories, setAvailableCategories] = useState<Category[]>([])
+  const [availableSubcategories, setAvailableSubcategories] = useState<Subcategory[]>([])
 
-  useEffect(() => {
-    if (!user) {
-      router.push("/auth/login")
-      return
-    }
-  }, [user, router])
+  // ⚡ Nombre de la entidad seleccionada según entityId
+  const selectedEntityName = entities.find((e) => e.id.toString() === entityId)?.nombre
 
-  // Update categories when entity changes
+  // ⚡ Cargar entidades
   useEffect(() => {
-    if (entity) {
-      const categories = getCategories(entity)
-      setAvailableCategories(categories)
-      setCategory("")
-      setSubcategory("")
-      setAvailableSubcategories([])
-    } else {
+    if (!user) return
+    fetch("/api/entities")
+      .then((res) => res.json())
+      .then((data) => setEntities(data))
+      .catch(() => setError("Error al cargar entidades"))
+  }, [user])
+
+  // ⚡ Cargar categorías según entidad seleccionada
+  useEffect(() => {
+    if (!entityId || !selectedEntityName) {
       setAvailableCategories([])
       setCategory("")
       setSubcategory("")
       setAvailableSubcategories([])
+      return
     }
-  }, [entity])
 
-  // Update subcategories when category changes
+    fetch(`/api/categories?entity=${encodeURIComponent(selectedEntityName)}`)
+      .then((res) => res.json())
+      .then((data) => {
+        setAvailableCategories(data)
+        setCategory("")
+        setSubcategory("")
+        setAvailableSubcategories([])
+      })
+      .catch(() => setError("Error al cargar categorías"))
+  }, [entityId, selectedEntityName])
+
+  // ⚡ Cargar subcategorías según categoría
   useEffect(() => {
-    if (entity && category) {
-      const subcategories = getSubcategories(entity, category)
-      setAvailableSubcategories(subcategories)
-      setSubcategory("")
-    } else {
+    if (!entityId || !category || !selectedEntityName) {
       setAvailableSubcategories([])
       setSubcategory("")
+      return
     }
-  }, [entity, category])
+
+    fetch(
+      `/api/subcategories?entity=${encodeURIComponent(selectedEntityName)}&category=${encodeURIComponent(category)}`
+    )
+      .then((res) => res.json())
+      .then((data) => {
+        setAvailableSubcategories(data)
+        setSubcategory("")
+      })
+      .catch(() => setError("Error al cargar subcategorías"))
+  }, [entityId, category, selectedEntityName])
 
   const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
-    if (file) {
-      if (file.size > 5 * 1024 * 1024) {
-        // 5MB limit
-        setError("La imagen no puede superar los 5MB")
-        return
-      }
+    if (!file) return
+    if (file.size > 5 * 1024 * 1024) return setError("La imagen no puede superar los 5MB")
+    if (!file.type.startsWith("image/")) return setError("Solo se permiten archivos de imagen")
 
-      if (!file.type.startsWith("image/")) {
-        setError("Solo se permiten archivos de imagen")
-        return
-      }
-
-      setPhoto(file)
-      const reader = new FileReader()
-      reader.onload = (e) => {
-        setPhotoPreview(e.target?.result as string)
-      }
-      reader.readAsDataURL(file)
-      setError("")
-    }
+    setPhoto(file)
+    const reader = new FileReader()
+    reader.onload = (e) => setPhotoPreview(e.target?.result as string)
+    reader.readAsDataURL(file)
+    setError("")
   }
 
   const removePhoto = () => {
@@ -104,17 +108,9 @@ export default function NewComplaintPage() {
     setPhotoPreview(null)
   }
 
-  const generateTitle = () => {
-    if (subcategory && location) {
-      setTitle(`${subcategory} en ${location}`)
-    } else if (subcategory) {
-      setTitle(subcategory)
-    }
-  }
-
   const clearForm = () => {
     setTitle("")
-    setEntity("")
+    setEntityId("")
     setCategory("")
     setSubcategory("")
     setDescription("")
@@ -129,58 +125,47 @@ export default function NewComplaintPage() {
     setError("")
     setLoading(true)
 
-    // Validation
+    if (!user) {
+      setError("Debes iniciar sesión")
+      setLoading(false)
+      return
+    }
+
     if (!title.trim()) {
       setError("El título es obligatorio")
       setLoading(false)
       return
     }
 
-    if (!entity || !category || !subcategory) {
+    if (!entityId || !category || !subcategory) {
       setError("Debes seleccionar entidad, categoría y subcategoría")
       setLoading(false)
       return
     }
 
-    if (!description.trim()) {
-      setError("La descripción es obligatoria")
-      setLoading(false)
-      return
-    }
-
-    if (description.length < 20) {
+    if (!description.trim() || description.length < 20) {
       setError("La descripción debe tener al menos 20 caracteres")
       setLoading(false)
       return
     }
 
     try {
-      const newComplaint: Complaint = {
-        id: Date.now().toString(),
-        title: title.trim(),
-        entity,
-        category,
-        subcategory,
-        description: description.trim(),
-        location: location.trim(),
-        photo: photoPreview || undefined,
-        authorId: user!.id,
-        authorName: user!.name,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        status: "open",
-        votes: {
-          positive: 0,
-          negative: 0,
-          userVotes: {},
-        },
+      const formData = new FormData()
+      formData.append("title", title)
+      formData.append("entityId", entityId)  // ⚡ ID correcto
+      formData.append("category", category)
+      formData.append("subcategory", subcategory)
+      formData.append("description", description)
+      formData.append("location", location || "")
+      formData.append("authorId", user.id)
+      if (photo) formData.append("photo", photo)
+
+      const res = await fetch("/api/complaints", { method: "POST", body: formData })
+
+      if (!res.ok) {
+        const data = await res.json()
+        throw new Error(data?.error || "Error al crear reclamo")
       }
-
-      // Save to localStorage
-      saveComplaint(newComplaint)
-
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 1000))
 
       toast({
         title: "¡Reclamo creado exitosamente! 🎉",
@@ -189,234 +174,103 @@ export default function NewComplaintPage() {
 
       clearForm()
       router.push("/complaints/my")
-    } catch (err) {
-      setError("Error al crear el reclamo. Inténtalo nuevamente.")
+    } catch (err: any) {
+      console.error("Error al crear reclamo:", err)
+      setError(err.message || "Error al crear el reclamo. Inténtalo nuevamente.")
     } finally {
       setLoading(false)
     }
   }
 
-  const handleCancel = () => {
-    clearForm()
-  }
-
-  if (!user) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600"></div>
-      </div>
-    )
-  }
-
-  const entities = getEntities()
+  if (!user) return <div className="min-h-screen flex items-center justify-center"><div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600"></div></div>
 
   return (
     <div className="flex min-h-screen bg-gray-50">
       <Sidebar />
+      <main className="flex-1 md:ml-64 p-6">
+        <Button variant="ghost" onClick={() => router.back()} className="mb-4">
+          <ArrowLeft className="mr-2 h-4 w-4" /> Volver
+        </Button>
 
-      <main className="flex-1 md:ml-64">
-        <div className="p-6">
-          {/* Header */}
-          <div className="mb-6">
-            <Button variant="ghost" onClick={() => router.back()} className="mb-4">
-              <ArrowLeft className="mr-2 h-4 w-4" />
-              Volver
-            </Button>
-            <div className="flex items-center gap-3 mb-2">
-              <FileText className="h-8 w-8 text-blue-600" />
-              <h1 className="text-3xl font-bold text-gray-900">Crear Nuevo Reclamo</h1>
-            </div>
-            <p className="text-gray-600">Completa el formulario para registrar tu reclamo</p>
-          </div>
+        {error && <Alert variant="destructive" className="mb-4"><AlertDescription>{error}</AlertDescription></Alert>}
 
-          <div className="max-w-2xl mx-auto">
-            <Card>
-              <CardHeader>
-                <CardTitle>Información del Reclamo</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <form onSubmit={handleSubmit} className="space-y-6">
-                  {error && (
-                    <Alert variant="destructive">
-                      <AlertDescription>{error}</AlertDescription>
-                    </Alert>
-                  )}
+        <Card>
+          <CardHeader><CardTitle>Nuevo Reclamo</CardTitle></CardHeader>
+          <CardContent>
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div>
+                <Label>Título</Label>
+                <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Título del reclamo" />
+              </div>
 
-                  {/* Entity Selection */}
-                  <div className="space-y-2">
-                    <Label htmlFor="entity">
-                      Entidad <span className="text-red-500">*</span>
-                    </Label>
-                    <Select value={entity} onValueChange={setEntity}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecciona una entidad" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {entities.map((ent) => (
-                          <SelectItem key={ent} value={ent}>
-                            {ent}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {/* ENTIDAD */}
+                <div>
+                  <Label>Entidad</Label>
+                  <Select value={entityId} onValueChange={setEntityId}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecciona entidad" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {entities.map((e) => (
+                        <SelectItem key={e.id} value={e.id.toString()}>{e.nombre}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
 
-                  {/* Category Selection */}
-                  <div className="space-y-2">
-                    <Label htmlFor="category">
-                      Categoría <span className="text-red-500">*</span>
-                    </Label>
-                    <Select value={category} onValueChange={setCategory} disabled={!entity}>
-                      <SelectTrigger>
-                        <SelectValue
-                          placeholder={entity ? "Selecciona una categoría" : "Primero selecciona una entidad"}
-                        />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {availableCategories.map((cat) => (
-                          <SelectItem key={cat} value={cat}>
-                            {cat}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
+                {/* CATEGORÍA */}
+                <div>
+                  <Label>Categoría</Label>
+                  <Select value={category} onValueChange={setCategory} disabled={!entityId}>
+                    <SelectTrigger><SelectValue placeholder="Selecciona categoría" /></SelectTrigger>
+                    <SelectContent>
+                      {availableCategories.map((c) => (
+                        <SelectItem key={c.id} value={c.nombre}>{c.nombre}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
 
-                  {/* Subcategory Selection */}
-                  <div className="space-y-2">
-                    <Label htmlFor="subcategory">
-                      Subcategoría <span className="text-red-500">*</span>
-                    </Label>
-                    <Select value={subcategory} onValueChange={setSubcategory} disabled={!category}>
-                      <SelectTrigger>
-                        <SelectValue
-                          placeholder={category ? "Selecciona una subcategoría" : "Primero selecciona una categoría"}
-                        />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {availableSubcategories.map((subcat) => (
-                          <SelectItem key={subcat} value={subcat}>
-                            {subcat}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
+                {/* SUBCATEGORÍA */}
+                <div>
+                  <Label>Subcategoría</Label>
+                  <Select value={subcategory} onValueChange={setSubcategory} disabled={!category}>
+                    <SelectTrigger><SelectValue placeholder="Selecciona subcategoría" /></SelectTrigger>
+                    <SelectContent>
+                      {availableSubcategories.map((s, i) => <SelectItem key={i} value={s.nombre}>{s.nombre}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
 
-                  {/* Location */}
-                  <div className="space-y-2">
-                    <Label htmlFor="location">Ubicación</Label>
-                    <Input
-                      id="location"
-                      value={location}
-                      onChange={(e) => setLocation(e.target.value)}
-                      placeholder="Ej: Av. Principal 123, Barrio Centro"
-                      onBlur={generateTitle}
-                    />
-                    <p className="text-sm text-gray-500">Especifica dónde ocurre el problema</p>
-                  </div>
+              <div>
+                <Label>Descripción</Label>
+                <Textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Describe tu reclamo..." />
+              </div>
 
-                  {/* Title */}
-                  <div className="space-y-2">
-                    <Label htmlFor="title">
-                      Título del Reclamo <span className="text-red-500">*</span>
-                    </Label>
-                    <Input
-                      id="title"
-                      value={title}
-                      onChange={(e) => setTitle(e.target.value)}
-                      placeholder="Ej: Lámparas quemadas en Av. Principal"
-                      maxLength={100}
-                    />
-                    <div className="flex justify-between text-sm text-gray-500">
-                      <span>Un título claro y descriptivo</span>
-                      <span>{title.length}/100</span>
-                    </div>
-                    {subcategory && location && !title && (
-                      <Button type="button" variant="outline" size="sm" onClick={generateTitle}>
-                        Generar título automático
-                      </Button>
-                    )}
-                  </div>
+              <div>
+                <Label>Ubicación</Label>
+                <Input value={location} onChange={(e) => setLocation(e.target.value)} placeholder="Dirección, ciudad, etc." />
+              </div>
 
-                  {/* Description */}
-                  <div className="space-y-2">
-                    <Label htmlFor="description">
-                      Descripción <span className="text-red-500">*</span>
-                    </Label>
-                    <Textarea
-                      id="description"
-                      value={description}
-                      onChange={(e) => setDescription(e.target.value)}
-                      placeholder="Describe detalladamente el problema, cuándo ocurre, cómo afecta, etc."
-                      rows={5}
-                      maxLength={1000}
-                    />
-                    <div className="flex justify-between text-sm text-gray-500">
-                      <span>Mínimo 20 caracteres. Sé específico y detallado.</span>
-                      <span>{description.length}/1000</span>
-                    </div>
-                  </div>
-
-                  {/* Photo Upload */}
-                  <div className="space-y-2">
-                    <Label htmlFor="photo">Foto (Opcional)</Label>
-                    {!photoPreview ? (
-                      <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-gray-400 transition-colors">
-                        <Upload className="mx-auto h-12 w-12 text-gray-400 mb-4" />
-                        <div className="space-y-2">
-                          <p className="text-sm text-gray-600">Sube una imagen que muestre el problema</p>
-                          <p className="text-xs text-gray-500">PNG, JPG hasta 5MB</p>
-                          <input
-                            type="file"
-                            id="photo"
-                            accept="image/*"
-                            onChange={handlePhotoChange}
-                            className="hidden"
-                          />
-                          <Button
-                            type="button"
-                            variant="outline"
-                            onClick={() => document.getElementById("photo")?.click()}
-                          >
-                            Seleccionar Imagen
-                          </Button>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="relative">
-                        <img
-                          src={photoPreview || "/placeholder.svg"}
-                          alt="Preview"
-                          className="w-full h-48 object-cover rounded-lg"
-                        />
-                        <Button
-                          type="button"
-                          variant="destructive"
-                          size="sm"
-                          className="absolute top-2 right-2"
-                          onClick={removePhoto}
-                        >
-                          <X className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Submit Button */}
-                  <div className="flex gap-4 pt-4">
-                    <Button type="submit" disabled={loading} className="flex-1">
-                      {loading ? "Creando reclamo..." : "Crear Reclamo"}
-                    </Button>
-                    <Button type="button" variant="outline" onClick={handleCancel}>
-                      Cancelar
+              <div>
+                <Label>Imagen</Label>
+                <input type="file" accept="image/*" onChange={handlePhotoChange} />
+                {photoPreview && (
+                  <div className="relative mt-2 w-64 h-40">
+                    <img src={photoPreview} className="object-cover w-full h-full rounded-md" />
+                    <Button onClick={removePhoto} className="absolute top-1 right-1 p-1 rounded-full bg-red-500 text-white">
+                      <X size={16} />
                     </Button>
                   </div>
-                </form>
-              </CardContent>
-            </Card>
-          </div>
-        </div>
+                )}
+              </div>
+
+              <Button type="submit" disabled={loading}>{loading ? "Creando..." : "Crear Reclamo"}</Button>
+            </form>
+          </CardContent>
+        </Card>
       </main>
     </div>
   )

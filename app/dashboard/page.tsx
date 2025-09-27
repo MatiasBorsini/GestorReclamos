@@ -6,8 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { ComplaintCard } from "@/components/complaints/complaint-card"
-import { Plus, Search, Filter } from "lucide-react"
-import { mockComplaints } from "@/lib/mock-data"
+import { Search, Filter } from "lucide-react"
 import type { Complaint } from "@/types/complaint"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
@@ -15,90 +14,128 @@ import { useRouter } from "next/navigation"
 export default function DashboardPage() {
   const { user } = useAuth()
   const router = useRouter()
-  const [complaints, setComplaints] = useState<Complaint[]>(mockComplaints)
-  const [filteredComplaints, setFilteredComplaints] = useState<Complaint[]>(mockComplaints)
+  const [complaints, setComplaints] = useState<Complaint[]>([])
+  const [filteredComplaints, setFilteredComplaints] = useState<Complaint[]>([])
   const [searchTerm, setSearchTerm] = useState("")
   const [entityFilter, setEntityFilter] = useState<string>("all")
   const [statusFilter, setStatusFilter] = useState<string>("all")
+  const [entities, setEntities] = useState<string[]>([])
 
+  // Traer todas las entidades desde DB
+  useEffect(() => {
+    const fetchEntities = async () => {
+      try {
+        const res = await fetch("/api/entities")
+        const data = await res.json()
+        setEntities(data.map((e: any) => e.nombre))
+      } catch (err) {
+        console.error("Error al cargar entidades:", err)
+      }
+    }
+    fetchEntities()
+  }, [])
+
+  // Fetch todos los reclamos
   useEffect(() => {
     if (!user) {
       router.push("/auth/login")
       return
     }
+
+    const fetchComplaints = async () => {
+      try {
+        const res = await fetch("/api/auth/complaints")
+        const data: Complaint[] = await res.json()
+        setComplaints(data)
+      } catch (error) {
+        console.error("Error al cargar reclamos:", error)
+      }
+    }
+
+    fetchComplaints()
   }, [user, router])
 
+  // Aplicar filtros
   useEffect(() => {
     let filtered = complaints
 
     if (searchTerm) {
       filtered = filtered.filter(
-        (complaint) =>
-          complaint.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          complaint.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          complaint.location.toLowerCase().includes(searchTerm.toLowerCase()),
+        (c) =>
+          c.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          c.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          (c.location?.toLowerCase().includes(searchTerm.toLowerCase()) ?? false)
       )
     }
 
     if (entityFilter !== "all") {
-      filtered = filtered.filter((complaint) => complaint.entity === entityFilter)
+      filtered = filtered.filter((c) => c.entity === entityFilter)
     }
 
     if (statusFilter !== "all") {
-      filtered = filtered.filter((complaint) => complaint.status === statusFilter)
+      filtered = filtered.filter((c) => c.status === statusFilter)
     }
 
     setFilteredComplaints(filtered)
   }, [complaints, searchTerm, entityFilter, statusFilter])
 
-  const handleVote = (complaintId: string, voteType: "positive" | "negative") => {
-    if (!user) return
+  // Manejar votos
+const handleVote = async (complaintId: string, voteType: "positive" | "negative") => {
+  if (!user) return;
 
-    setComplaints((prev) =>
-      prev.map((complaint) => {
-        if (complaint.id === complaintId) {
-          const currentVote = complaint.votes.userVotes[user.id]
-          const newUserVotes = { ...complaint.votes.userVotes }
+  const complaint = complaints.find(c => c.id === complaintId);
+  if (!complaint) return;
 
-          if (currentVote === voteType) {
-            // Remove vote
-            delete newUserVotes[user.id]
-            return {
-              ...complaint,
-              votes: {
-                ...complaint.votes,
-                positive: voteType === "positive" ? complaint.votes.positive - 1 : complaint.votes.positive,
-                negative: voteType === "negative" ? complaint.votes.negative - 1 : complaint.votes.negative,
-                userVotes: newUserVotes,
-              },
-            }
-          } else {
-            // Add or change vote
-            newUserVotes[user.id] = voteType
-            return {
-              ...complaint,
-              votes: {
-                positive:
-                  voteType === "positive"
-                    ? complaint.votes.positive + 1
-                    : currentVote === "positive"
-                      ? complaint.votes.positive - 1
-                      : complaint.votes.positive,
-                negative:
-                  voteType === "negative"
-                    ? complaint.votes.negative + 1
-                    : currentVote === "negative"
-                      ? complaint.votes.negative - 1
-                      : complaint.votes.negative,
-                userVotes: newUserVotes,
-              },
-            }
-          }
-        }
-        return complaint
+  const currentVote = complaint.votes.userVotes[user.id] ?? null;
+  const newVote = currentVote === voteType ? null : voteType; // null = desmarcar
+
+  try {
+    const res = await fetch("/api/auth/vote", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        userId: user.id,
+        complaintId: complaint.id,
+        type: newVote,
       }),
-    )
+    });
+
+    if (!res.ok) {
+      const errData = await res.json();
+      console.error("Error al registrar el voto:", errData);
+      return; // no lanzar excepción, solo log
+    }
+
+    const data = await res.json();
+
+    setComplaints(prev =>
+      prev.map(c => {
+        if (c.id !== complaintId) return c;
+
+        const updatedUserVotes = { ...c.votes.userVotes };
+
+        if (currentVote) delete updatedUserVotes[user.id];
+        if (newVote) updatedUserVotes[user.id] = newVote;
+
+        const positive = Object.values(updatedUserVotes).filter(v => v === "positive").length;
+        const negative = Object.values(updatedUserVotes).filter(v => v === "negative").length;
+
+        return {
+          ...c,
+          votes: {
+            userVotes: updatedUserVotes,
+            positive,
+            negative,
+          },
+        };
+      })
+    );
+  } catch (err) {
+    console.error("Error al votar:", err);
   }
+};
+
+
 
   if (!user) {
     return (
@@ -108,31 +145,20 @@ export default function DashboardPage() {
     )
   }
 
-  const entities = ["Municipios", "Escuelas", "Clubes", "Cooperativas"]
-
   return (
     <div className="flex min-h-screen bg-gray-50">
-      {/* Simplified layout structure with md:ml-64 */}
       <div className="p-6 md:ml-64">
         {/* Header */}
-        <div className="mb-8">
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
-              <p className="text-gray-600 mt-1">Gestiona y visualiza todos los reclamos</p>
-            </div>
-            <Link href="/complaints/new">
-              <Button
-                size="lg"
-                className="relative bg-gradient-to-r from-blue-600 via-blue-700 to-purple-600 hover:from-blue-700 hover:via-blue-800 hover:to-purple-700 text-white font-bold shadow-2xl hover:shadow-blue-500/25 transform hover:scale-110 transition-all duration-300 border-0 px-8 py-4 text-lg animate-pulse hover:animate-none"
-              >
-                <div className="absolute inset-0 bg-gradient-to-r from-blue-400 to-purple-400 rounded-md blur opacity-30 animate-pulse"></div>
-                <div className="relative flex items-center">
-                  <Plus className="mr-3 h-6 w-6 animate-bounce" />✨ Crear Nuevo Reclamo ✨
-                </div>
-              </Button>
-            </Link>
+        <div className="mb-8 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
+            <p className="text-gray-600 mt-1">Gestiona y visualiza todos los reclamos</p>
           </div>
+          <Link href="/complaints/new">
+            <Button size="lg" className="bg-blue-600 text-white px-6 py-3">
+              + Crear Nuevo Reclamo
+            </Button>
+          </Link>
         </div>
 
         {/* Filters */}
@@ -146,6 +172,7 @@ export default function DashboardPage() {
               className="pl-10"
             />
           </div>
+
           <Select value={entityFilter} onValueChange={setEntityFilter}>
             <SelectTrigger className="w-full md:w-48">
               <Filter className="mr-2 h-4 w-4" />
@@ -153,13 +180,15 @@ export default function DashboardPage() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Todas las entidades</SelectItem>
-              {entities.map((entity) => (
-                <SelectItem key={entity} value={entity}>
-                  {entity}
-                </SelectItem>
-              ))}
+             {entities.map((entity, idx) => (
+              <SelectItem key={idx} value={entity}>
+                {entity}
+              </SelectItem>
+            ))}
+
             </SelectContent>
           </Select>
+
           <Select value={statusFilter} onValueChange={setStatusFilter}>
             <SelectTrigger className="w-full md:w-48">
               <SelectValue placeholder="Filtrar por estado" />
@@ -170,28 +199,6 @@ export default function DashboardPage() {
               <SelectItem value="closed">Cerrados</SelectItem>
             </SelectContent>
           </Select>
-        </div>
-
-        {/* Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-          <div className="bg-white p-6 rounded-lg shadow-sm border">
-            <h3 className="text-sm font-medium text-gray-600">Total Reclamos</h3>
-            <p className="text-2xl font-bold text-gray-900">{complaints.length}</p>
-          </div>
-          <div className="bg-white p-6 rounded-lg shadow-sm border">
-            <h3 className="text-sm font-medium text-gray-600">Abiertos</h3>
-            <p className="text-2xl font-bold text-green-600">{complaints.filter((c) => c.status === "open").length}</p>
-          </div>
-          <div className="bg-white p-6 rounded-lg shadow-sm border">
-            <h3 className="text-sm font-medium text-gray-600">Cerrados</h3>
-            <p className="text-2xl font-bold text-gray-600">{complaints.filter((c) => c.status === "closed").length}</p>
-          </div>
-          <div className="bg-white p-6 rounded-lg shadow-sm border">
-            <h3 className="text-sm font-medium text-gray-600">Mis Reclamos</h3>
-            <p className="text-2xl font-bold text-blue-600">
-              {complaints.filter((c) => c.authorId === user.id).length}
-            </p>
-          </div>
         </div>
 
         {/* Complaints Grid */}
@@ -210,3 +217,4 @@ export default function DashboardPage() {
     </div>
   )
 }
+

@@ -10,20 +10,32 @@ import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Search, Users, Shield, Trash2, UserCheck } from "lucide-react"
-import { mockUsers } from "@/lib/mock-admin-data"
-import type { User } from "@/types/auth"
 import { useRouter } from "next/navigation"
 import { useToast } from "@/hooks/use-toast"
+import type { User } from "@/types/auth"
+
+// Función para obtener usuarios desde la API
+async function fetchUsers(): Promise<User[]> {
+  const res = await fetch("/api/admin/users")
+  if (!res.ok) throw new Error("Error al cargar usuarios")
+  const data = await res.json()
+  return data.map((u: any) => ({
+    ...u,
+    createdAt: new Date(u.createdAt),
+    updatedAt: new Date(u.updatedAt),
+  }))
+}
 
 export default function AdminUsersPage() {
   const { user } = useAuth()
   const router = useRouter()
   const { toast } = useToast()
 
-  const [users, setUsers] = useState<User[]>(mockUsers)
-  const [filteredUsers, setFilteredUsers] = useState<User[]>(mockUsers)
+  const [users, setUsers] = useState<User[]>([])
+  const [filteredUsers, setFilteredUsers] = useState<User[]>([])
   const [searchTerm, setSearchTerm] = useState("")
   const [roleFilter, setRoleFilter] = useState<string>("all")
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     if (!user) {
@@ -35,6 +47,14 @@ export default function AdminUsersPage() {
       router.push("/dashboard")
       return
     }
+
+    fetchUsers()
+      .then((data) => {
+        setUsers(data)
+        setFilteredUsers(data)
+      })
+      .catch((err) => console.error(err))
+      .finally(() => setLoading(false))
   }, [user, router])
 
   useEffect(() => {
@@ -44,7 +64,7 @@ export default function AdminUsersPage() {
       filtered = filtered.filter(
         (u) =>
           u.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          u.email.toLowerCase().includes(searchTerm.toLowerCase()),
+          u.email.toLowerCase().includes(searchTerm.toLowerCase())
       )
     }
 
@@ -55,7 +75,7 @@ export default function AdminUsersPage() {
     setFilteredUsers(filtered)
   }, [users, searchTerm, roleFilter])
 
-  if (!user || user.role !== "admin") {
+  if (!user || user.role !== "admin" || loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600"></div>
@@ -63,7 +83,8 @@ export default function AdminUsersPage() {
     )
   }
 
-  const handleDeleteUser = (userId: string) => {
+  // 🔹 Eliminar usuario en la BD
+  const handleDeleteUser = async (userId: string) => {
     const userToDelete = users.find((u) => u.id === userId)
     if (!userToDelete) return
 
@@ -77,15 +98,33 @@ export default function AdminUsersPage() {
     }
 
     if (confirm(`¿Estás seguro de que quieres eliminar al usuario ${userToDelete.name}?`)) {
-      setUsers((prev) => prev.filter((u) => u.id !== userId))
-      toast({
-        title: "Usuario eliminado",
-        description: `El usuario ${userToDelete.name} ha sido eliminado exitosamente.`,
-      })
+      try {
+        const res = await fetch("/api/admin/users", {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ userId }),
+        })
+
+        if (!res.ok) throw new Error("Error al eliminar usuario")
+
+        setUsers((prev) => prev.filter((u) => u.id !== userId))
+        toast({
+          title: "Usuario eliminado",
+          description: `El usuario ${userToDelete.name} ha sido eliminado exitosamente.`,
+        })
+      } catch (error) {
+        console.error(error)
+        toast({
+          title: "Error",
+          description: "Hubo un problema al eliminar el usuario.",
+          variant: "destructive",
+        })
+      }
     }
   }
 
-  const handleRoleChange = (userId: string, newRole: "client" | "admin") => {
+  // 🔹 Cambiar rol en la BD
+  const handleRoleChange = async (userId: string, newRole: "client" | "admin") => {
     const userToUpdate = users.find((u) => u.id === userId)
     if (!userToUpdate) return
 
@@ -98,12 +137,31 @@ export default function AdminUsersPage() {
       return
     }
 
-    setUsers((prev) => prev.map((u) => (u.id === userId ? { ...u, role: newRole } : u)))
+    try {
+      const res = await fetch("/api/admin/users", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId, role: newRole }),
+      })
 
-    toast({
-      title: "Rol actualizado",
-      description: `${userToUpdate.name} ahora es ${newRole === "admin" ? "administrador" : "cliente"}.`,
-    })
+      if (!res.ok) throw new Error("Error al actualizar rol")
+
+      const updatedUser = await res.json()
+
+      setUsers((prev) => prev.map((u) => (u.id === userId ? updatedUser : u)))
+
+      toast({
+        title: "Rol actualizado",
+        description: `${updatedUser.name} ahora es ${newRole === "admin" ? "administrador" : "cliente"}.`,
+      })
+    } catch (error) {
+      console.error(error)
+      toast({
+        title: "Error",
+        description: "No se pudo actualizar el rol del usuario.",
+        variant: "destructive",
+      })
+    }
   }
 
   const clientUsers = filteredUsers.filter((u) => u.role === "client")

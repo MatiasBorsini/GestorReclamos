@@ -8,7 +8,6 @@ import { Input } from "@/components/ui/input"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { X, Search, ArrowLeft, Bot, Sparkles } from "lucide-react"
-import { mockFAQs } from "@/lib/mock-admin-data"
 import type { FAQ } from "@/types/faq"
 
 interface ChatMessage {
@@ -21,7 +20,7 @@ interface ChatMessage {
 export function Chatbot() {
   const pathname = usePathname()
   const [isOpen, setIsOpen] = useState(false)
-  const [faqs] = useState<FAQ[]>(mockFAQs.filter((faq) => faq.isActive))
+  const [faqs, setFaqs] = useState<FAQ[]>([])
   const [filteredFaqs, setFilteredFaqs] = useState<FAQ[]>([])
   const [searchTerm, setSearchTerm] = useState("")
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
@@ -32,6 +31,22 @@ export function Chatbot() {
 
   const shouldShowChatbot = !pathname.startsWith("/auth/login")
 
+  // 🔹 Cargar FAQs desde la API
+  useEffect(() => {
+    async function loadFaqs() {
+      try {
+        const res = await fetch("/api/admin/faqs")
+        const data = await res.json()
+        setFaqs(data)
+        setFilteredFaqs(data)
+      } catch (error) {
+        console.error("Error cargando FAQs:", error)
+      }
+    }
+    loadFaqs()
+  }, [])
+
+  // 🔹 Filtrado por categoría
   useEffect(() => {
     if (selectedCategory) {
       const categoryFaqs = faqs.filter((faq) => faq.category === selectedCategory)
@@ -41,6 +56,7 @@ export function Chatbot() {
     }
   }, [selectedCategory, faqs])
 
+  // 🔹 Filtrado por búsqueda
   useEffect(() => {
     if (searchTerm) {
       const filtered = faqs.filter(

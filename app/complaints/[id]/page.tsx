@@ -5,42 +5,71 @@ import { useAuth } from "@/contexts/auth-context"
 import { Sidebar } from "@/components/layout/sidebar"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
+import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { ThumbsUp, ThumbsDown, MapPin, Calendar, ArrowLeft, Edit, Trash2 } from "lucide-react"
-import { mockComplaints } from "@/lib/mock-data"
+import { useRouter, useParams } from "next/navigation"
+import { useToast } from "@/hooks/use-toast"
 import type { Complaint } from "@/types/complaint"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
-import { useToast } from "@/hooks/use-toast"
 
-interface ComplaintDetailPageProps {
-  params: {
-    id: string
-  }
-}
-
-export default function ComplaintDetailPage({ params }: ComplaintDetailPageProps) {
+export default function ComplaintDetailPage() {
   const { user } = useAuth()
   const router = useRouter()
   const { toast } = useToast()
+  const params = useParams()
+  const id = params?.id as string
+
   const [complaint, setComplaint] = useState<Complaint | null>(null)
   const [userVote, setUserVote] = useState<"positive" | "negative" | null>(null)
+  const [loading, setLoading] = useState(true)
 
+  // Traer reclamo por ID
   useEffect(() => {
     if (!user) {
       router.push("/auth/login")
       return
     }
 
-    const foundComplaint = mockComplaints.find((c) => c.id === params.id)
-    if (foundComplaint) {
-      setComplaint(foundComplaint)
-      setUserVote(foundComplaint.votes.userVotes[user.id] || null)
-    }
-  }, [user, params.id, router])
+    const fetchComplaint = async () => {
+      setLoading(true)
+      try {
+        const res = await fetch(`/api/auth/complaints/${id}`)
+        if (!res.ok) throw new Error("Error al cargar reclamo")
+        const data = await res.json()
 
-  if (!user || !complaint) {
+        const mappedComplaint: Complaint = {
+          id: data.id,
+          title: data.title,
+          entity: data.entity ?? "Desconocida",
+          category: data.category,
+          subcategory: data.subcategory,
+          description: data.description,
+          location: data.location ?? null,
+          imageUrl: data.imageUrl ?? null,
+          status: data.status === "open" ? "open" : "closed",
+          createdAt: new Date(data.createdAt).toISOString(),
+          updatedAt: new Date(data.updatedAt).toISOString(),
+          authorId: data.authorId,
+          authorName: data.authorName ?? "Desconocido",
+          votes: data.votes,
+        }
+
+        setComplaint(mappedComplaint)
+        setUserVote(mappedComplaint.votes.userVotes[user.id] ?? null)
+      } catch (err) {
+        console.error(err)
+        toast({ title: "Error al cargar reclamo", variant: "destructive" })
+        router.push("/complaints/my")
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchComplaint()
+  }, [id, user, router, toast])
+
+  if (!user || loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600"></div>
@@ -48,69 +77,78 @@ export default function ComplaintDetailPage({ params }: ComplaintDetailPageProps
     )
   }
 
+  if (!complaint) return null
+
   const isOwnComplaint = user.id === complaint.authorId
   const canVote = !isOwnComplaint
 
-  const handleVote = (voteType: "positive" | "negative") => {
-    if (!canVote) return
+  // Manejar votos
+  const handleVote = async (voteType: "positive" | "negative") => {
+    if (!user || !complaint) return
 
-    const newVote = userVote === voteType ? null : voteType
-    setUserVote(newVote)
+    const currentVote = complaint.votes.userVotes[user.id] ?? null
+    const newVote = currentVote === voteType ? null : voteType
 
-    // Update complaint votes (mock implementation)
-    setComplaint((prev) => {
-      if (!prev) return prev
-
-      const newUserVotes = { ...prev.votes.userVotes }
-      if (newVote) {
-        newUserVotes[user.id] = newVote
-      } else {
-        delete newUserVotes[user.id]
-      }
-
-      return {
-        ...prev,
-        votes: {
-          positive:
-            voteType === "positive"
-              ? newVote
-                ? prev.votes.positive + 1
-                : prev.votes.positive - 1
-              : userVote === "positive"
-                ? prev.votes.positive - 1
-                : prev.votes.positive,
-          negative:
-            voteType === "negative"
-              ? newVote
-                ? prev.votes.negative + 1
-                : prev.votes.negative - 1
-              : userVote === "negative"
-                ? prev.votes.negative - 1
-                : prev.votes.negative,
-          userVotes: newUserVotes,
-        },
-      }
-    })
-  }
-
-  const handleDelete = () => {
-    if (confirm("¿Estás seguro de que quieres eliminar este reclamo?")) {
-      toast({
-        title: "Reclamo eliminado",
-        description: "El reclamo ha sido eliminado exitosamente.",
+    try {
+      const res = await fetch("/api/auth/vote", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId: user.id,
+          complaintId: complaint.id,
+          type: newVote,
+        }),
       })
-      router.push("/complaints/my")
+
+      const data = await res.json()
+      if (!res.ok) {
+        console.error("Error al registrar el voto:", data)
+        return
+      }
+
+      const updatedUserVotes = { ...complaint.votes.userVotes }
+      if (currentVote) delete updatedUserVotes[user.id]
+      if (newVote) updatedUserVotes[user.id] = newVote
+
+      setComplaint({
+        ...complaint,
+        votes: {
+          userVotes: updatedUserVotes,
+          positive: Object.values(updatedUserVotes).filter(v => v === "positive").length,
+          negative: Object.values(updatedUserVotes).filter(v => v === "negative").length,
+        },
+      })
+      setUserVote(newVote)
+    } catch (err) {
+      console.error("Error al votar:", err)
     }
   }
 
-  const getStatusColor = (status: string) => {
-    return status === "open" ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-800"
+  // Manejar eliminación
+  const handleDelete = async () => {
+    if (!complaint) return
+    if (confirm("¿Estás seguro de que quieres eliminar este reclamo?")) {
+      try {
+        const res = await fetch(`/api/auth/complaints/${complaint.id}`, { method: "DELETE" })
+        if (!res.ok) throw new Error("Error al eliminar")
+        toast({
+          title: "Reclamo eliminado",
+          description: "El reclamo ha sido eliminado exitosamente.",
+        })
+        router.push("/complaints/my")
+      } catch (err) {
+        console.error(err)
+        toast({ title: "Error al eliminar", variant: "destructive" })
+      }
+    }
   }
+
+  const getStatusColor = (status: "open" | "closed") =>
+    status === "open" ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-800"
 
   return (
     <div className="flex min-h-screen bg-gray-50">
       <Sidebar />
-
       <main className="flex-1 md:ml-64">
         <div className="p-6">
           {/* Header */}
@@ -125,9 +163,7 @@ export default function ComplaintDetailPage({ params }: ComplaintDetailPageProps
                 <div className="flex flex-wrap gap-2 mb-4">
                   <Badge variant="outline">{complaint.entity}</Badge>
                   <Badge variant="secondary">{complaint.category}</Badge>
-                  <Badge variant="outline" className="text-xs">
-                    {complaint.subcategory}
-                  </Badge>
+                  <Badge variant="outline" className="text-xs">{complaint.subcategory}</Badge>
                   <Badge className={getStatusColor(complaint.status)}>
                     {complaint.status === "open" ? "Abierto" : "Cerrado"}
                   </Badge>
@@ -168,7 +204,7 @@ export default function ComplaintDetailPage({ params }: ComplaintDetailPageProps
                       <p className="font-medium">{complaint.authorName}</p>
                       <div className="flex items-center gap-2 text-sm text-gray-600">
                         <Calendar className="h-4 w-4" />
-                        <span>Creado el {complaint.createdAt.toLocaleDateString()}</span>
+                        <span>Creado el {new Date(complaint.createdAt).toLocaleDateString()}</span>
                       </div>
                     </div>
                   </div>
@@ -190,11 +226,11 @@ export default function ComplaintDetailPage({ params }: ComplaintDetailPageProps
                       </div>
                     )}
 
-                    {complaint.photo && (
+                    {complaint.imageUrl && (
                       <div>
                         <h3 className="font-semibold mb-2">Imagen</h3>
                         <img
-                          src={complaint.photo || "/placeholder.svg"}
+                          src={complaint.imageUrl}
                           alt="Foto del reclamo"
                           className="w-full max-w-md h-64 object-cover rounded-lg"
                         />
@@ -207,78 +243,27 @@ export default function ComplaintDetailPage({ params }: ComplaintDetailPageProps
 
             {/* Sidebar */}
             <div className="space-y-6">
-              {/* Voting */}
               <Card>
                 <CardHeader>
-                  <h3 className="font-semibold">Votación</h3>
+                  <h3 className="font-semibold">Votos</h3>
                 </CardHeader>
-                <CardContent>
-                  {canVote ? (
-                    <div className="space-y-3">
-                      <p className="text-sm text-gray-600 mb-4">¿Qué opinas sobre este reclamo?</p>
-                      <Button
-                        variant={userVote === "positive" ? "default" : "outline"}
-                        className="w-full justify-start"
-                        onClick={() => handleVote("positive")}
-                      >
-                        <ThumbsUp className="mr-2 h-4 w-4" />
-                        Me parece bien ({complaint.votes.positive})
-                      </Button>
-                      <Button
-                        variant={userVote === "negative" ? "destructive" : "outline"}
-                        className="w-full justify-start"
-                        onClick={() => handleVote("negative")}
-                      >
-                        <ThumbsDown className="mr-2 h-4 w-4" />
-                        No me parece bien ({complaint.votes.negative})
-                      </Button>
-                    </div>
-                  ) : (
-                    <div className="space-y-3">
-                      <p className="text-sm text-gray-600 mb-4">{isOwnComplaint ? "Este es tu reclamo" : "Votación"}</p>
-                      <div className="flex items-center justify-between text-sm">
-                        <div className="flex items-center gap-2">
-                          <ThumbsUp className="h-4 w-4 text-green-600" />
-                          <span>{complaint.votes.positive} votos positivos</span>
-                        </div>
-                      </div>
-                      <div className="flex items-center justify-between text-sm">
-                        <div className="flex items-center gap-2">
-                          <ThumbsDown className="h-4 w-4 text-red-600" />
-                          <span>{complaint.votes.negative} votos negativos</span>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-
-              {/* Details */}
-              <Card>
-                <CardHeader>
-                  <h3 className="font-semibold">Detalles</h3>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <div>
-                    <p className="text-sm font-medium text-gray-600">Entidad</p>
-                    <p className="text-sm">{complaint.entity}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-gray-600">Categoría</p>
-                    <p className="text-sm">{complaint.category}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-gray-600">Subcategoría</p>
-                    <p className="text-sm">{complaint.subcategory}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-gray-600">Estado</p>
-                    <p className="text-sm">{complaint.status === "open" ? "Abierto" : "Cerrado"}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-gray-600">Última actualización</p>
-                    <p className="text-sm">{complaint.updatedAt.toLocaleDateString()}</p>
-                  </div>
+                <CardContent className="flex items-center gap-4">
+                  <Button
+                    variant={userVote === "positive" ? "default" : "outline"}
+                    onClick={() => handleVote("positive")}
+                    disabled={!canVote}
+                  >
+                    <ThumbsUp className="mr-2 h-4 w-4" />
+                    {complaint.votes.positive}
+                  </Button>
+                  <Button
+                    variant={userVote === "negative" ? "default" : "outline"}
+                    onClick={() => handleVote("negative")}
+                    disabled={!canVote}
+                  >
+                    <ThumbsDown className="mr-2 h-4 w-4" />
+                    {complaint.votes.negative}
+                  </Button>
                 </CardContent>
               </Card>
             </div>

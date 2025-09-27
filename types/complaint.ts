@@ -1,27 +1,35 @@
+// types/complaint.ts
 
-export interface Vote {
-  id: string
-  userId: string
-  complaintId: string
-  type: "positive" | "negative"
-  createdAt: string
+// Mapa de votos por usuario
+export type VoteMap = {
+  [userId: string]: "positive" | "negative"
 }
 
-export interface Complaint {
+// Estructura de votos de un reclamo
+export type ComplaintVotes = {
+  positive: number
+  negative: number
+  userVotes: VoteMap
+}
+
+// Tipo principal de Complaint
+export type Complaint = {
   id: string
   title: string
   entity: string
   category: string
   subcategory: string
   description: string
-  location?: string | null
-  imageUrl?: string | null
-  authorId: string
-  authorName: string
+  location: string | null
+  imageUrl: string | null
+  status: "open" | "closed"
   createdAt: string
   updatedAt: string
-  status: "open" | "closed"
-
-  // Relación con Prisma
-  userVotes: Vote[]
+  authorId: string       // Id del autor
+  authorName: string     // Nombre del autor, para mostrar en el frontend
+  votes: ComplaintVotes
+  userVotes?: {
+    userId: string
+    type: "positive" | "negative"
+  }[]
 }

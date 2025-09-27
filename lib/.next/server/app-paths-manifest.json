@@ -1,0 +1,11 @@
+{
+  "/api/auth/complaints/[id]/route": "app/api/auth/complaints/[id]/route.js",
+  "/api/auth/login/route": "app/api/auth/login/route.js",
+  "/api/auth/complaints/route": "app/api/auth/complaints/route.js",
+  "/auth/login/page": "app/auth/login/page.js",
+  "/complaints/[id]/page": "app/complaints/[id]/page.js",
+  "/complaints/edit/[id]/page": "app/complaints/edit/[id]/page.js",
+  "/complaints/my/page": "app/complaints/my/page.js",
+  "/dashboard/page": "app/dashboard/page.js",
+  "/page": "app/page.js"
+}

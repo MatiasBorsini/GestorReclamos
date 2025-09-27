@@ -39,6 +39,9 @@ model Complaint {
   authorId     String
   author       User      @relation(fields: [authorId], references: [id])
   userVotes    Vote[]   // ← esta relación activa el sistema de votos
+  // 🔹 Relación con Entidad
+  entityId     Int?
+  entidad      Entidad?  @relation(fields: [entityId], references: [id])
 }
 
 
@@ -48,6 +51,7 @@ model Entidad {
   categorias  Categoria[]
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
+  complaints Complaint[] // relación inversa
 }
 
 model Categoria {
@@ -58,6 +62,7 @@ model Categoria {
   subcategorias SubCategoria[]
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
+  @@unique([nombre, entidadId])
 }
 
 model SubCategoria {
@@ -67,6 +72,7 @@ model SubCategoria {
   categoria   Categoria  @relation(fields: [categoriaId], references: [id])
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @updatedAt
+  @@unique([nombre, categoriaId])
 }
 model Vote {
   id          String    @id @default(uuid())
@@ -77,4 +83,14 @@ model Vote {
 
   user        User      @relation(fields: [userId], references: [id])
   complaint   Complaint @relation(fields: [complaintId], references: [id])
+}
+
+model FAQ {
+  id        String   @id @default(uuid())
+  question  String
+  answer    String
+  category  String
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
