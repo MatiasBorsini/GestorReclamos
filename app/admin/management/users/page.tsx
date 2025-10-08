@@ -253,7 +253,7 @@ export default function AdminUsersPage() {
                             {userItem.role === "admin" ? "Administrador" : "Cliente"}
                           </Badge>
                           <span className="text-sm text-gray-500">
-                            Miembro desde {userItem.createdAt.toLocaleDateString()}
+                             Miembro desde {new Date(userItem.createdAt).toLocaleDateString()}
                           </span>
                         </div>
                       </div>

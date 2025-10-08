@@ -34,10 +34,14 @@ export async function DELETE(request: Request, { params }: { params: { id: strin
   }
 }
 
-// PATCH: alternar estado activo/inactivo
-export async function PATCH(request: Request, { params }: { params: { id: string } }) {
+/// PATCH: alternar estado activo/inactivo
+export async function PATCH(
+  request: Request,
+  context: { params: Promise<{ id: string }> }
+) {
   try {
-    const { id } = params;
+    const { id } = await context.params; // 👈 importante: await params
+
     const faq = await prisma.fAQ.findUnique({ where: { id } });
 
     if (!faq) {
@@ -52,6 +56,10 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     return NextResponse.json(updated);
   } catch (error) {
     console.error("Error al cambiar estado de FAQ:", error);
-    return NextResponse.json({ error: "No se pudo cambiar el estado" }, { status: 500 });
+    return NextResponse.json(
+      { error: "No se pudo cambiar el estado" },
+      { status: 500 }
+    );
   }
 }
+

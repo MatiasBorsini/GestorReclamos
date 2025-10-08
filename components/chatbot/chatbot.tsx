@@ -228,9 +228,7 @@ export function Chatbot() {
   const renderChat = () => (
     <div className="flex flex-col h-full">
       <div className="flex items-center gap-2 mb-4 pb-2 border-b">
-        <Button variant="ghost" size="sm" onClick={() => setView("faqs")} className="hover:bg-blue-50">
-          <ArrowLeft className="h-4 w-4" />
-        </Button>
+       
         <div className="flex-1">
           <h3 className="font-semibold">Asistente Virtual</h3>
           <p className="text-sm text-gray-600">Respuesta a tu consulta</p>
@@ -310,50 +308,50 @@ export function Chatbot() {
 
       {/* Chat Dialog */}
       <Dialog open={isOpen} onOpenChange={setIsOpen}>
-        <DialogContent className="max-w-md h-[600px] flex flex-col p-0">
-          <DialogHeader className="p-6 pb-4 border-b bg-gradient-to-r from-blue-50 to-purple-50">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="relative">
-                  <div className="h-12 w-12 bg-gradient-to-br from-blue-600 to-purple-600 rounded-full flex items-center justify-center">
-                    <Bot className="h-6 w-6 text-white" />
-                  </div>
-                  <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-500 rounded-full border-2 border-white animate-pulse"></div>
-                </div>
-                <div>
-                  <DialogTitle className="text-gray-900">Asistente Virtual</DialogTitle>
-                  <p className="text-sm text-gray-600">Sistema de Reclamos • En línea</p>
-                </div>
-              </div>
-              <Button variant="ghost" size="sm" onClick={handleCloseDialog} className="hover:bg-white/50">
-                <X className="h-4 w-4" />
-              </Button>
+  <DialogContent className="max-w-md h-[600px] flex flex-col p-0">
+    {/* Encabezado */}
+    <DialogHeader className="p-6 pb-4 border-b bg-gradient-to-r from-blue-50 to-purple-50">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="relative">
+            <div className="h-12 w-12 bg-gradient-to-br from-blue-600 to-purple-600 rounded-full flex items-center justify-center">
+              <Bot className="h-6 w-6 text-white" />
             </div>
-          </DialogHeader>
-
-          <div className="flex-1 p-6 overflow-hidden">
-            {view !== "categories" && (
-              <div className="mb-4">
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-                  <Input
-                    placeholder="Buscar en todas las preguntas..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-10 border-blue-200 focus:border-blue-400"
-                  />
-                </div>
-              </div>
-            )}
-
-            <div className="h-full">
-              {view === "categories" && renderCategories()}
-              {view === "faqs" && renderFaqs()}
-              {view === "chat" && renderChat()}
-            </div>
+            <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-500 rounded-full border-2 border-white animate-pulse"></div>
           </div>
-        </DialogContent>
-      </Dialog>
+          <div>
+            <DialogTitle className="text-gray-900">Asistente Virtual</DialogTitle>
+            <p className="text-sm text-gray-600">Sistema de Reclamos • En línea</p>
+          </div>
+        </div>
+
+      </div>
+    </DialogHeader>
+
+    {/* Área de contenido con scroll */}
+    <div className="flex-1 overflow-y-auto px-6 py-4">
+      {view !== "categories" && (
+        <div className="mb-4">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+            <Input
+              placeholder="Buscar en todas las preguntas..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-10 border-blue-200 focus:border-blue-400"
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Render dinámico */}
+      {view === "categories" && renderCategories()}
+      {view === "faqs" && renderFaqs()}
+      {view === "chat" && renderChat()}
+    </div>
+  </DialogContent>
+</Dialog>
+
     </>
   )
 }
