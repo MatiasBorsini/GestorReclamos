@@ -14,6 +14,7 @@ import { useRouter } from "next/navigation"
 import { useToast } from "@/hooks/use-toast"
 import Link from "next/link"
 import type { Complaint } from "@/types/complaint"
+import { LocationDisplay } from "@/components/location/LocationDisplay"
 
 type ComplaintWithVotes = Complaint & {
   userVotes?: { userId: string; type: "positive" | "negative" }[]
@@ -251,7 +252,14 @@ export default function AdminComplaintsPage() {
                             <span>
                               Creado: {new Date(complaint.createdAt).toLocaleDateString()}
                             </span>
-                            <span>Ubicación: {complaint.location}</span>
+                            {complaint.location && (
+                              <LocationDisplay
+                                location={complaint.location}
+                                userRole="admin"
+                                compact={true}
+                                showIcon={false}
+                              />
+                            )}
                             <span>Votos: {complaint.userVotes?.length ?? 0}</span>
                           </div>
                         </div>

@@ -9,7 +9,7 @@ import { Chatbot } from "@/components/chatbot/chatbot"
 import { LayoutWrapper } from "@/components/layout/layout-wrapper"
 
 export const metadata: Metadata = {
-  title: "Sistema de Reclamos",
+  title: "MiReclamo",
   description: "Gestión de reclamos para sociedades",
   generator: "v0.dev",
 }

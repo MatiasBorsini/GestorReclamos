@@ -105,8 +105,8 @@ export default function LoginPage() {
 
           <div className="mt-4 p-3 bg-gray-50 rounded-lg text-xs text-gray-600">
             <p className="font-semibold mb-1">Cuentas de prueba:</p>
-            <p>Admin: admin@test.com / password</p>
-            <p>Cliente: cliente@test.com / password</p>
+            <p>Admin: admin@test.com / TuClave123</p>
+            <p>Cliente: cliente@test.com / TuClave123</p>
           </div>
         </CardContent>
       </Card>

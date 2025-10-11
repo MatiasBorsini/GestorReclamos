@@ -155,6 +155,12 @@ export async function DELETE(
       return NextResponse.json({ error: "No autorizado" }, { status: 403 });
     }
 
+    // 1️⃣ Borrar primero todos los votos asociados
+    await prisma.vote.deleteMany({
+      where: { complaintId: cleanId },
+    });
+
+    // 2️⃣ Luego borrar el reclamo
     await prisma.complaint.delete({
       where: { id: cleanId },
     });

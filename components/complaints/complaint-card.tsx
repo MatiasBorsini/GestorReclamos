@@ -9,6 +9,7 @@ import type { Complaint } from "@/types/complaint"
 import { useAuth } from "@/contexts/auth-context"
 import { useState } from "react"
 import Link from "next/link"
+import { LocationDisplay } from "@/components/location/LocationDisplay"
 
 interface ComplaintCardProps {
   complaint: Complaint
@@ -73,10 +74,11 @@ export function ComplaintCard({
         <p className="text-gray-700 mb-3 line-clamp-3">{complaint.description}</p>
 
         {complaint.location && (
-          <div className="flex items-center gap-1 text-sm text-gray-600 mb-3">
-            <MapPin className="h-4 w-4" />
-            <span>{complaint.location}</span>
-          </div>
+          <LocationDisplay
+            location={complaint.location}
+            userRole={user?.role || "client"}
+            className="mb-3"
+          />
         )}
 
         {complaint.imageUrl && (

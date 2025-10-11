@@ -142,6 +142,25 @@ export async function PATCH(request: Request) {
       include: { author: true, entidad: true, userVotes: true },
     });
 
+    // 📧 Enviar notificación de cambio de estado a n8n
+    try {
+      await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/webhooks/complaint-notifications`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          complaintId: updated.id,
+          action: status === 'closed' ? 'closed' : 'reopened',
+          userEmail: updated.author.email,
+          complaintTitle: updated.title,
+          complaintDescription: updated.description
+        })
+      });
+      console.log(`📧 Notificación de ${status === 'closed' ? 'cierre' : 'reapertura'} enviada a n8n`);
+    } catch (notificationError) {
+      console.error("⚠️ Error enviando notificación:", notificationError);
+      // No fallar la actualización si falla la notificación
+    }
+
     const userVotesMap: { [key: string]: "positive" | "negative" } = {};
     updated.userVotes.forEach((v) => {
       if (v.type === "positive" || v.type === "negative") {

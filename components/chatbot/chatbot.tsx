@@ -129,7 +129,7 @@ export function Chatbot() {
             id: "welcome",
             type: "bot",
             content:
-              "¡Hola! Soy el asistente virtual del sistema de reclamos. Puedo ayudarte con preguntas frecuentes. ¿En qué puedo ayudarte?",
+              "¡Hola! Soy el asistente virtual de MiReclamos. Puedo ayudarte con preguntas frecuentes. ¿En qué puedo ayudarte?",
             timestamp: new Date(),
           },
         ])

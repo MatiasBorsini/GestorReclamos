@@ -23,6 +23,9 @@ model User {
   createdAt DateTime @default(now())
   complaints Complaint[]
   votes     Vote[]       // ← este es el nuevo campo que soluciona el error
+  verificado          Boolean   @default(false)
+  token_verificacion   String?   @unique
+  fecha_verificacion   DateTime?
 }
 
 model Complaint {

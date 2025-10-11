@@ -87,6 +87,25 @@ export async function POST(req: Request) {
       include: { author: true, entidad: true, userVotes: true },
     });
 
+    // 📧 Enviar notificación de creación a n8n
+    try {
+      await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/webhooks/complaint-notifications`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          complaintId: complaint.id,
+          action: 'created',
+          userEmail: complaint.author.email,
+          complaintTitle: complaint.title,
+          complaintDescription: complaint.description
+        })
+      });
+      console.log("📧 Notificación de creación enviada a n8n");
+    } catch (notificationError) {
+      console.error("⚠️ Error enviando notificación:", notificationError);
+      // No fallar la creación del reclamo si falla la notificación
+    }
+
     return NextResponse.json(
       {
         id: complaint.id,

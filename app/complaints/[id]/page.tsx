@@ -12,6 +12,7 @@ import { useRouter, useParams } from "next/navigation"
 import { useToast } from "@/hooks/use-toast"
 import type { Complaint } from "@/types/complaint"
 import Link from "next/link"
+import { ComplaintMapNoAPI } from "@/components/maps/ComplaintMapNoAPI"
 
 export default function ComplaintDetailPage() {
   const { user } = useAuth()
@@ -217,13 +218,12 @@ export default function ComplaintDetailPage() {
                     </div>
 
                     {complaint.location && (
-                      <div>
-                        <h3 className="font-semibold mb-2">Ubicación</h3>
-                        <div className="flex items-center gap-2 text-gray-700">
-                          <MapPin className="h-4 w-4" />
-                          <span>{complaint.location}</span>
-                        </div>
-                      </div>
+                      <ComplaintMapNoAPI
+                        location={complaint.location}
+                        userRole={user.role}
+                        complaintTitle={complaint.title}
+                        className="mt-4"
+                      />
                     )}
 
                     {complaint.imageUrl && (

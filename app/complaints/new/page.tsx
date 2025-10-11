@@ -13,6 +13,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { ArrowLeft, X } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useToast } from "@/hooks/use-toast"
+import { SimpleLocationPicker } from "@/components/location/SimpleLocationPicker"
 
 type Entity = { id: number; nombre: string }
 type Category = { id: number; nombre: string }
@@ -249,10 +250,11 @@ export default function NewComplaintPage() {
                 <Textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Describe tu reclamo..." />
               </div>
 
-              <div>
-                <Label>Ubicación</Label>
-                <Input value={location} onChange={(e) => setLocation(e.target.value)} placeholder="Dirección, ciudad, etc." />
-              </div>
+              <SimpleLocationPicker
+                value={location}
+                onChange={setLocation}
+                placeholder="Selecciona la ubicación del problema"
+              />
 
               <div>
                 <Label>Imagen</Label>

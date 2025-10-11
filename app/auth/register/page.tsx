@@ -64,7 +64,7 @@ export default function RegisterPage() {
         <CardHeader className="text-center">
           <UserPlus className="h-12 w-12 text-blue-600 mx-auto mb-4" />
           <CardTitle className="text-2xl">Crear Cuenta</CardTitle>
-          <CardDescription>Regístrate para acceder al sistema de reclamos</CardDescription>
+          <CardDescription>Regístrate para acceder al MiReclamos</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">

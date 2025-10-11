@@ -3,7 +3,7 @@
 import { useAuth } from "@/contexts/auth-context"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
-import { Home, FileText, Plus, User, LogOut, BarChart3, MessageSquare, Menu, X } from "lucide-react"
+import { Home, FileText, Plus, User, LogOut, BarChart3, MessageSquare, Menu, X, MapPin } from "lucide-react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { useState } from "react"
@@ -29,6 +29,7 @@ export function Sidebar({ className }: SidebarProps) {
   const adminNavItems = [
     { href: "/admin", label: "Panel Principal", icon: BarChart3 },
     { href: "/admin/management", label: "Gestión", icon: MessageSquare },
+    { href: "/admin/map", label: "Mapa de Reclamos", icon: MapPin },
   ]
 
   const navItems = user.role === "admin" ? adminNavItems : clientNavItems
