@@ -251,10 +251,10 @@ export default function NewComplaintPage() {
               </div>
 
               <SimpleLocationPicker
-                value={location}
-                onChange={setLocation}
-                placeholder="Selecciona la ubicación del problema"
-              />
+  value={location}
+  onChange={setLocation}
+/>
+
 
               <div>
                 <Label>Imagen</Label>

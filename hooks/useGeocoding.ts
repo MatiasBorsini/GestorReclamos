@@ -39,38 +39,39 @@ export function useGeocoding(location: string | null, userRole: 'admin' | 'clien
 
   // Función para convertir coordenadas a dirección legible
   const reverseGeocode = async (lat: number, lng: number): Promise<string> => {
+    if (!lat || !lng) return "Coordenadas inválidas"
+
     try {
-      // Usar Nominatim (OpenStreetMap) que es gratuito y no requiere API key
       const response = await fetch(
         `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`,
         {
           headers: {
-            'User-Agent': 'ComplaintSystem/1.0'
-          }
+            "User-Agent": "ComplaintSystem/1.0",
+            "Accept-Language": "es",
+          },
         }
       )
-      
+
       if (!response.ok) {
-        throw new Error('Error en geocoding')
+        console.warn("⚠️ Error HTTP en geocoding:", response.status)
+        return `Coordenadas: ${lat.toFixed(6)}, ${lng.toFixed(6)}`
       }
-      
+
       const data = await response.json()
-      
-      if (data.display_name) {
-        // Extraer información relevante de la dirección
-        const address = data.display_name
-        const parts = address.split(', ')
-        
-        // Tomar las primeras 3-4 partes para una dirección más legible
-        return parts.slice(0, 4).join(', ')
+
+      if (data?.display_name) {
+        const parts = data.display_name.split(", ")
+        return parts.slice(0, 4).join(", ")
       }
-      
-      return `${lat.toFixed(6)}, ${lng.toFixed(6)}`
+
+      return `Coordenadas: ${lat.toFixed(6)}, ${lng.toFixed(6)}`
     } catch (error) {
-      console.error('Error en reverse geocoding:', error)
-      throw error
+      console.warn("⚠️ Error en reverseGeocode:", error)
+      // Fallback seguro (no lanzamos error)
+      return `Coordenadas: ${lat.toFixed(6)}, ${lng.toFixed(6)}`
     }
   }
+
 
   // Efecto principal
   useEffect(() => {
@@ -120,6 +121,9 @@ export function useGeocoding(location: string | null, userRole: 'admin' | 'clien
     error
   }
 }
+
+
+
 
 
 

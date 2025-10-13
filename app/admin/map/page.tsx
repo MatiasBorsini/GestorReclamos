@@ -139,16 +139,7 @@ export default function AdminMapPage() {
                   <li>• <strong>Marcadores:</strong> Haz clic para ver detalles del reclamo</li>
                 </ul>
               </div>
-              <div>
-                <h4 className="font-semibold mb-2">🎨 Colores:</h4>
-                <ul className="space-y-1 text-gray-600">
-                  <li>• <strong>Rojo:</strong> Infraestructura</li>
-                  <li>• <strong>Azul:</strong> Servicios Públicos</li>
-                  <li>• <strong>Verde:</strong> Ambiente</li>
-                  <li>• <strong>Naranja:</strong> Seguridad</li>
-                  <li>• <strong>Otros:</strong> Gris</li>
-                </ul>
-              </div>
+              
             </div>
           </CardContent>
         </Card>
@@ -156,34 +147,7 @@ export default function AdminMapPage() {
         {/* Mapa principal */}
         <AdminComplaintsMap className="mb-6" />
 
-        {/* Información adicional */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">ℹ️ Información del Sistema</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid md:grid-cols-2 gap-4 text-sm">
-              <div>
-                <h4 className="font-semibold mb-2">🔧 Tecnologías:</h4>
-                <ul className="space-y-1 text-gray-600">
-                  <li>• <strong>Leaflet.js:</strong> Biblioteca de mapas</li>
-                  <li>• <strong>OpenStreetMap:</strong> Mapas gratuitos</li>
-                  <li>• <strong>React Leaflet:</strong> Integración con React</li>
-                  <li>• <strong>Nominatim:</strong> Geocoding gratuito</li>
-                </ul>
-              </div>
-              <div>
-                <h4 className="font-semibold mb-2">📊 Características:</h4>
-                <ul className="space-y-1 text-gray-600">
-                  <li>• <strong>Marcadores personalizados:</strong> Colores por categoría</li>
-                  <li>• <strong>Popups informativos:</strong> Detalles del reclamo</li>
-                  <li>• <strong>Filtros:</strong> Por categoría</li>
-                  <li>• <strong>Responsive:</strong> Funciona en móviles</li>
-                </ul>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+
       </main>
     </div>
   )

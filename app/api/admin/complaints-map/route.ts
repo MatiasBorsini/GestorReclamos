@@ -99,3 +99,6 @@ function getMarkerColor(category: string): string {
 
 
 
+
+
+
