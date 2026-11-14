@@ -47,7 +47,18 @@ La aplicación contempla distintas entidades, como municipalidades, hospitales, 
 
 **4. Administración:** análisis del volumen de reclamos, distribución por entidades, votos y actividad reciente.
 
-Para ver imágenes y una presentación general del proyecto, consultá el portafolio profesional cuando esté disponible públicamente.
+## 📸 Capturas del sistema
+
+Imágenes de demostración del proyecto; no representan un servicio institucional en producción.
+
+### Dashboard de reclamos
+![Dashboard de reclamos](assets/capturas/dashboard.png)
+
+### Registro de un reclamo
+![Formulario de nuevo reclamo](assets/capturas/formulario-reclamo.png)
+
+### Panel administrativo
+![Panel administrativo y estadísticas](assets/capturas/panel-administracion.png)
 
 ## 🧰 Tecnologías utilizadas
 
